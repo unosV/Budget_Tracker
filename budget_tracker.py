@@ -567,15 +567,19 @@ else:
         
         with col2:
             st.subheader("💸 Expenses")
-            
+
             for category in user_categories:
-                current_data['expenses'][category] = st.number_input(
-                    category,
-                    min_value=0.0,
-                    value=float(current_data['expenses'].get(category, 0)),
-                    step=10.0,
-                    key=f'expense_{category}'
+            # Show current amount (or 0) as the default text
+                previous_value = current_data['expenses'].get(category, 0)
+                user_input = st.text_input(
+                category,
+                value=str(previous_value),
+                key=f"expense_{category}"
                 )
+
+            # Convert things like "23.69+23.87" into a final float
+            amount = parse_amount_input(user_input, previous_value)
+            current_data['expenses'][category] = amount
         
         # Add custom one-time expense
         st.markdown("---")
