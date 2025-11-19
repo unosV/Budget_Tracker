@@ -15,32 +15,54 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Responsive CSS for mobile/tablet/desktop
+# Enhanced responsive CSS
 st.markdown("""
 <style>
     /* Mobile optimizations */
     @media (max-width: 768px) {
         .block-container {
-            padding: 1rem !important;
+            padding: 0.5rem 1rem !important;
         }
         h1 { font-size: 1.5rem !important; }
         h2 { font-size: 1.2rem !important; }
         h3 { font-size: 1rem !important; }
+        .stButton button {
+            min-height: 44px !important;
+            font-size: 16px !important;
+        }
+        .stNumberInput input {
+            min-height: 44px !important;
+            font-size: 16px !important;
+        }
     }
     
     /* Tablet optimizations */
     @media (min-width: 769px) and (max-width: 1024px) {
         .block-container {
-            padding: 2rem !important;
+            padding: 1.5rem 2rem !important;
+        }
+        h1 { font-size: 1.8rem !important; }
+        h2 { font-size: 1.4rem !important; }
+    }
+    
+    /* Desktop optimizations */
+    @media (min-width: 1025px) {
+        .block-container {
+            padding: 2rem 3rem !important;
         }
     }
     
-    /* Make inputs more touch-friendly on mobile */
-    @media (max-width: 768px) {
-        input, button {
-            min-height: 44px !important;
-            font-size: 16px !important;
-        }
+    /* Quick add styling */
+    .quick-add-container {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    
+    /* Better spacing */
+    .stNumberInput > div > div {
+        margin-bottom: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -48,7 +70,7 @@ st.markdown("""
 # File paths
 USERS_FILE = Path("users.json")
 
-# Default expense categories (starting point for new users)
+# Default expense categories
 DEFAULT_CATEGORIES = [
     "Rent/Mortgage", "Utilities", "Groceries", "Transport", 
     "Entertainment", "Healthcare", "Insurance", "Savings",
@@ -108,8 +130,6 @@ def signup(username, password, email):
     }
     
     save_users(users)
-    
-    # Initialize empty budget data for new user with default categories
     save_user_data(username, {'categories': DEFAULT_CATEGORIES.copy(), 'months': {}})
     
     return True, "Account created successfully! Please login."
@@ -147,15 +167,24 @@ def add_category(username, category_name):
     return False, "Category already exists!"
 
 def remove_category(username, category_name):
-    """Remove an expense category for user"""
+    """Remove an expense category and clean up all month data"""
     data = load_user_data(username)
     if 'categories' not in data:
         data['categories'] = DEFAULT_CATEGORIES.copy()
     
     if category_name in data['categories']:
+        # Remove from categories list
         data['categories'].remove(category_name)
+        
+        # Clean up from all months
+        if 'months' in data:
+            for month in data['months']:
+                if 'expenses' in data['months'][month]:
+                    if category_name in data['months'][month]['expenses']:
+                        del data['months'][month]['expenses'][category_name]
+        
         save_user_data(username, data)
-        return True, f"Category '{category_name}' removed!"
+        return True, f"Category '{category_name}' removed from all months!"
     return False, "Category not found!"
 
 def get_user_categories(username):
@@ -179,7 +208,6 @@ def initialize_session_state():
     if st.session_state.logged_in:
         if 'data' not in st.session_state:
             data = load_user_data(st.session_state.username)
-            # Migrate old data format to new format
             if 'months' not in data:
                 data = {'categories': data.get('categories', DEFAULT_CATEGORIES.copy()), 'months': data}
                 if 'categories' in data['months']:
@@ -189,7 +217,7 @@ def initialize_session_state():
             st.session_state.current_month = get_month_key()
 
 def create_pie_chart(expenses_data, title):
-    """Create expense breakdown pie chart - RESPONSIVE"""
+    """Create expense breakdown pie chart - RESPONSIVE & PERFECT MARGINS"""
     df = pd.DataFrame(list(expenses_data.items()), columns=['Category', 'Amount'])
     df = df[df['Amount'] > 0]
     
@@ -203,31 +231,32 @@ def create_pie_chart(expenses_data, title):
     fig.update_traces(
         textposition='outside', 
         textinfo='percent+label',
-        textfont_size=11
+        textfont_size=10
     )
     fig.update_layout(
-        height=450,
+        height=500,
         title=dict(
             text=title,
             x=0.5,
             xanchor='center',
-            y=0.98,
-            font=dict(size=16)
+            y=0.95,
+            font=dict(size=18)
         ),
         legend=dict(
             orientation="v",
             yanchor="middle",
             y=0.5,
             xanchor="left",
-            x=1.02,
+            x=1.05,
             font=dict(size=10)
         ),
-        margin=dict(l=10, r=150, t=50, b=10)
+        margin=dict(l=20, r=200, t=80, b=20),
+        showlegend=True
     )
     return fig
 
 def create_bar_chart(expenses_data, income, title):
-    """Create income vs expenses bar chart - RESPONSIVE"""
+    """Create income vs expenses bar chart - RESPONSIVE & PERFECT MARGINS"""
     total_expenses = sum(expenses_data.values())
     savings = income - total_expenses
     
@@ -238,7 +267,8 @@ def create_bar_chart(expenses_data, income, title):
             y=[income], 
             marker_color='#2ecc71',
             text=[f'${income:,.0f}'],
-            textposition='outside'
+            textposition='outside',
+            textfont=dict(size=14)
         ),
         go.Bar(
             name='Expenses', 
@@ -246,7 +276,8 @@ def create_bar_chart(expenses_data, income, title):
             y=[total_expenses], 
             marker_color='#e74c3c',
             text=[f'${total_expenses:,.0f}'],
-            textposition='outside'
+            textposition='outside',
+            textfont=dict(size=14)
         ),
         go.Bar(
             name='Savings', 
@@ -254,7 +285,8 @@ def create_bar_chart(expenses_data, income, title):
             y=[savings], 
             marker_color='#3498db',
             text=[f'${savings:,.0f}'],
-            textposition='outside'
+            textposition='outside',
+            textfont=dict(size=14)
         )
     ])
     
@@ -263,22 +295,22 @@ def create_bar_chart(expenses_data, income, title):
             text=title,
             x=0.5,
             xanchor='center',
-            y=0.98,
-            font=dict(size=16)
+            y=0.95,
+            font=dict(size=18)
         ),
         barmode='group',
-        height=450,
+        height=500,
         yaxis_title='Amount ($)',
         showlegend=True,
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=-0.15,
+            yanchor="bottom",
+            y=-0.2,
             xanchor="center",
             x=0.5,
-            font=dict(size=11)
+            font=dict(size=12)
         ),
-        margin=dict(l=50, r=50, t=60, b=80)
+        margin=dict(l=60, r=60, t=80, b=100)
     )
     return fig
 
@@ -326,13 +358,13 @@ def create_trend_chart(data, metric):
             text=f"{metric.capitalize()} Trend",
             x=0.5,
             xanchor='center',
-            font=dict(size=16)
+            font=dict(size=18)
         ),
         xaxis_title="Month",
         yaxis_title=f"Amount ($)",
-        height=400,
+        height=450,
         font=dict(size=12),
-        margin=dict(l=50, r=50, t=60, b=50)
+        margin=dict(l=60, r=60, t=80, b=60)
     )
     return fig
 
@@ -394,7 +426,6 @@ initialize_session_state()
 
 # LOGIN/SIGNUP PAGE
 if not st.session_state.logged_in:
-    # Responsive layout for login page
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -448,7 +479,7 @@ if not st.session_state.logged_in:
         st.markdown("---")
         st.info("👥 Each user has their own private budget data. Your information is stored securely.")
 
-# MAIN BUDGET TRACKER (Only shown when logged in)
+# MAIN BUDGET TRACKER
 else:
     # Header with logout
     col1, col2 = st.columns([5, 1])
@@ -469,7 +500,7 @@ else:
     user_categories = get_user_categories(st.session_state.username)
     
     with st.sidebar.expander("➕ Add New Category", expanded=False):
-        new_category = st.text_input("Category Name", key="new_category_name")
+        new_category = st.text_input("Category Name", key="new_category_name", placeholder="e.g., Mutual Funds")
         if st.button("Add Category", key="add_cat_btn"):
             if new_category:
                 success, message = add_category(st.session_state.username, new_category)
@@ -485,7 +516,8 @@ else:
     with st.sidebar.expander("❌ Remove Category", expanded=False):
         if len(user_categories) > 0:
             category_to_remove = st.selectbox("Select category to remove", user_categories, key="remove_cat_select")
-            if st.button("Remove Category", key="remove_cat_btn"):
+            st.warning("⚠️ This will remove the category from all months!")
+            if st.button("Remove Category", key="remove_cat_btn", type="secondary"):
                 success, message = remove_category(st.session_state.username, category_to_remove)
                 if success:
                     st.success(message)
@@ -504,7 +536,7 @@ else:
     st.sidebar.markdown("---")
     
     # Month Selection
-    st.sidebar.title("Month Selection")
+    st.sidebar.title("📅 Month Selection")
     months_data = st.session_state.data.get('months', {})
     all_months = sorted(list(months_data.keys()) + [get_month_key()])
     all_months = sorted(list(set(all_months)), reverse=True)
@@ -534,14 +566,18 @@ else:
         if cat not in current_data['expenses']:
             current_data['expenses'][cat] = 0
     
-    # Main content - Responsive tabs
+    # Remove deleted categories from current month
+    categories_to_remove = [cat for cat in current_data['expenses'].keys() if cat not in user_categories]
+    for cat in categories_to_remove:
+        del current_data['expenses'][cat]
+    
+    # Main content
     tab1, tab2, tab3 = st.tabs(["📝 Budget Input", "📊 Current Month", "📈 Trends & Insights"])
     
-    # TAB 1: Input
+    # TAB 1: Budget Input
     with tab1:
         st.header(f"Budget for {selected_month}")
         
-        # Responsive columns - stack on mobile
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -568,33 +604,63 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            for category in user_categories:
-                current_data['expenses'][category] = st.number_input(
-                    category,
-                    min_value=0.0,
-                    value=float(current_data['expenses'].get(category, 0)),
-                    step=10.0,
-                    key=f'expense_{category}'
-                )
+            # Display each category with quick add feature
+            for i, category in enumerate(user_categories):
+                st.markdown(f"**{category}**")
+                
+                col_main, col_add, col_btn = st.columns([3, 2, 1])
+                
+                with col_main:
+                    current_value = float(current_data['expenses'].get(category, 0))
+                    new_value = st.number_input(
+                        f"Total",
+                        min_value=0.0,
+                        value=current_value,
+                        step=10.0,
+                        key=f'expense_{category}_{i}',
+                        label_visibility="collapsed"
+                    )
+                    current_data['expenses'][category] = new_value
+                
+                with col_add:
+                    add_amount = st.number_input(
+                        f"Quick Add",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f'add_{category}_{i}',
+                        label_visibility="collapsed",
+                        placeholder="Quick add"
+                    )
+                
+                with col_btn:
+                    if st.button("➕", key=f'btn_{category}_{i}', help=f"Add ${add_amount:.2f} to {category}"):
+                        if add_amount > 0:
+                            current_data['expenses'][category] = current_value + add_amount
+                            st.success(f"Added ${add_amount:.2f}!")
+                            st.rerun()
         
         # Add custom one-time expense
         st.markdown("---")
         st.subheader("➕ Add Custom Expense (One-Time)")
         st.caption("Add a one-time expense for this month only (not a permanent category)")
         
-        col_a, col_b = st.columns([3, 1])
+        col_a, col_b, col_c = st.columns([3, 2, 1])
         with col_a:
             custom_expense_name = st.text_input("Expense Name", key='custom_expense_name', placeholder="e.g., Birthday Gift")
         with col_b:
             custom_expense_amount = st.number_input("Amount", min_value=0.0, step=10.0, key='custom_expense_amount')
-        
-        if st.button("Add Expense", key="add_expense_btn"):
-            if custom_expense_name:
-                current_data['expenses'][custom_expense_name] = custom_expense_amount
-                st.success(f"Added {custom_expense_name}: ${custom_expense_amount:,.2f}")
-                st.rerun()
-            else:
-                st.warning("Please enter an expense name")
+        with col_c:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Add", key="add_expense_btn", use_container_width=True):
+                if custom_expense_name:
+                    if custom_expense_name not in current_data['expenses']:
+                        current_data['expenses'][custom_expense_name] = 0
+                    current_data['expenses'][custom_expense_name] += custom_expense_amount
+                    st.success(f"Added {custom_expense_name}: ${custom_expense_amount:,.2f}")
+                    st.rerun()
+                else:
+                    st.warning("Please enter an expense name")
         
         # Save button
         st.markdown("---")
@@ -610,7 +676,6 @@ else:
         total_expenses = sum(current_data.get('expenses', {}).values())
         total_savings = income - total_expenses
         
-        # Responsive metrics - stack on mobile
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -625,7 +690,6 @@ else:
         
         st.markdown("---")
         
-        # Responsive chart columns
         col1, col2 = st.columns([1, 1])
         
         with col1:
@@ -712,6 +776,7 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 💡 Tips")
     st.sidebar.markdown("""
+    - Use Quick Add (➕) for daily expenses
     - Save your data regularly
     - Aim for 20% savings rate
     - Track expenses daily
