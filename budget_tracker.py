@@ -604,30 +604,45 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            # Display each category with math expression support
+            # Display each category with auto-calculating fields
             for i, category in enumerate(user_categories):
                 current_value = float(current_data['expenses'].get(category, 0))
+                
+                # Create unique key for tracking
+                input_key = f'expense_{category}_{i}'
                 
                 # Text input that accepts math expressions
                 user_input = st.text_input(
                     category,
                     value=str(current_value) if current_value > 0 else "",
-                    key=f'expense_{category}_{i}'
+                    key=input_key
                 )
                 
-                # Evaluate the expression and update immediately
-                if user_input:
+                # Auto-evaluate and update if it's a math expression
+                if user_input and user_input != str(current_value):
                     try:
-                        # Check if it's a math expression
+                        # Check if it contains math operators
                         if any(op in user_input for op in ['+', '-', '*', '/']):
                             # Evaluate the expression safely
                             result = eval(user_input, {"__builtins__": {}}, {})
-                            current_data['expenses'][category] = float(result)
+                            new_value = float(result)
+                            
+                            # Update the stored value
+                            current_data['expenses'][category] = new_value
+                            
+                            # Force immediate update by rerunning
+                            st.rerun()
                         else:
                             # Just a number
                             current_data['expenses'][category] = float(user_input)
                     except:
                         # Invalid expression, keep old value
+                        current_data['expenses'][category] = current_value
+                elif user_input:
+                    # Valid number input
+                    try:
+                        current_data['expenses'][category] = float(user_input)
+                    except:
                         current_data['expenses'][category] = current_value
                 else:
                     # Empty input = 0
