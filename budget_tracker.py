@@ -612,11 +612,10 @@ else:
                 user_input = st.text_input(
                     category,
                     value=str(current_value) if current_value > 0 else "",
-                    key=f'expense_{category}_{i}',
-                    placeholder=f"e.g., 25 + 22.6 or just 47.6"
+                    key=f'expense_{category}_{i}'
                 )
                 
-                # Evaluate the expression
+                # Evaluate the expression and update immediately
                 if user_input:
                     try:
                         # Check if it's a math expression
@@ -624,15 +623,12 @@ else:
                             # Evaluate the expression safely
                             result = eval(user_input, {"__builtins__": {}}, {})
                             current_data['expenses'][category] = float(result)
-                            st.caption(f"💡 Result: ${float(result):,.2f}")
                         else:
                             # Just a number
                             current_data['expenses'][category] = float(user_input)
                     except:
                         # Invalid expression, keep old value
                         current_data['expenses'][category] = current_value
-                        if user_input != str(current_value):
-                            st.caption("⚠️ Invalid expression")
                 else:
                     # Empty input = 0
                     current_data['expenses'][category] = 0
