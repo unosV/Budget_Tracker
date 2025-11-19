@@ -604,40 +604,38 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            # Display each category with clean quick add below
+            # Display each category with math expression support
             for i, category in enumerate(user_categories):
                 current_value = float(current_data['expenses'].get(category, 0))
                 
-                # Main amount field
-                new_value = st.number_input(
+                # Text input that accepts math expressions
+                user_input = st.text_input(
                     category,
-                    min_value=0.0,
-                    value=current_value,
-                    step=10.0,
-                    key=f'expense_{category}_{i}'
+                    value=str(current_value) if current_value > 0 else "",
+                    key=f'expense_{category}_{i}',
+                    placeholder=f"e.g., 25 + 22.6 or just 47.6"
                 )
-                current_data['expenses'][category] = new_value
                 
-                # Quick add below (inline)
-                col_add, col_btn = st.columns([4, 1])
-                with col_add:
-                    add_amount = st.number_input(
-                        f"+ Add to {category}",
-                        min_value=0.0,
-                        value=0.0,
-                        step=1.0,
-                        key=f'add_{category}_{i}',
-                        label_visibility="collapsed",
-                        placeholder=f"+ Add to {category}"
-                    )
-                with col_btn:
-                    if st.button("➕", key=f'btn_{category}_{i}', help=f"Add to {category}", use_container_width=True):
-                        if add_amount > 0:
-                            current_data['expenses'][category] = current_value + add_amount
-                            st.success(f"Added ${add_amount:.2f} to {category}!")
-                            st.rerun()
-                
-                st.markdown("---")
+                # Evaluate the expression
+                if user_input:
+                    try:
+                        # Check if it's a math expression
+                        if any(op in user_input for op in ['+', '-', '*', '/']):
+                            # Evaluate the expression safely
+                            result = eval(user_input, {"__builtins__": {}}, {})
+                            current_data['expenses'][category] = float(result)
+                            st.caption(f"💡 Result: ${float(result):,.2f}")
+                        else:
+                            # Just a number
+                            current_data['expenses'][category] = float(user_input)
+                    except:
+                        # Invalid expression, keep old value
+                        current_data['expenses'][category] = current_value
+                        if user_input != str(current_value):
+                            st.caption("⚠️ Invalid expression")
+                else:
+                    # Empty input = 0
+                    current_data['expenses'][category] = 0
         
         # Add custom one-time expense
         st.markdown("---")
