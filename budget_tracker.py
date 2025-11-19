@@ -566,16 +566,16 @@ else:
             current_data['debt'] = debt
         
         with col2:
-    st.subheader("💸 Expenses")
+            st.subheader("💸 Expenses")
             
-    for category in user_categories:
-        current_data['expenses'][category] = st.number_input(
-            category,
-            min_value=0.0,
-            value=float(current_data['expenses'].get(category, 0)),
-            step=10.0,
-            key=f'expense_{category}'
-        )
+            for category in user_categories:
+                current_data['expenses'][category] = st.number_input(
+                    category,
+                    min_value=0.0,
+                    value=float(current_data['expenses'].get(category, 0)),
+                    step=10.0,
+                    key=f'expense_{category}'
+                )
         
         # Add custom one-time expense
         st.markdown("---")
