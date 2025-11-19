@@ -608,24 +608,25 @@ else:
             for i, category in enumerate(user_categories):
                 current_value = float(current_data['expenses'].get(category, 0))
                 
-                # Create unique key for tracking
-                input_key = f'expense_{category}_{i}'
+                # Format value to 2 decimal places for display
+                display_value = f"{current_value:.2f}" if current_value > 0 else ""
                 
                 # Text input that accepts math expressions
                 user_input = st.text_input(
                     category,
-                    value=str(current_value) if current_value > 0 else "",
-                    key=input_key
+                    value=display_value,
+                    key=f'expense_{category}_{i}'
                 )
                 
                 # Auto-evaluate and update if it's a math expression
-                if user_input and user_input != str(current_value):
+                if user_input and user_input != display_value:
                     try:
                         # Check if it contains math operators
                         if any(op in user_input for op in ['+', '-', '*', '/']):
                             # Evaluate the expression safely
                             result = eval(user_input, {"__builtins__": {}}, {})
-                            new_value = float(result)
+                            # Round to 2 decimal places
+                            new_value = round(float(result), 2)
                             
                             # Update the stored value
                             current_data['expenses'][category] = new_value
@@ -633,15 +634,15 @@ else:
                             # Force immediate update by rerunning
                             st.rerun()
                         else:
-                            # Just a number
-                            current_data['expenses'][category] = float(user_input)
+                            # Just a number - round to 2 decimals
+                            current_data['expenses'][category] = round(float(user_input), 2)
                     except:
                         # Invalid expression, keep old value
                         current_data['expenses'][category] = current_value
                 elif user_input:
-                    # Valid number input
+                    # Valid number input - round to 2 decimals
                     try:
-                        current_data['expenses'][category] = float(user_input)
+                        current_data['expenses'][category] = round(float(user_input), 2)
                     except:
                         current_data['expenses'][category] = current_value
                 else:
