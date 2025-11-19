@@ -604,45 +604,47 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            # Display each category with auto-calculating fields
+            # Callback function to handle calculation
+            def calculate_expense(category, input_key):
+                user_input = st.session_state[input_key]
+                if user_input and any(op in str(user_input) for op in ['+', '-', '*', '/']):
+                    try:
+                        result = eval(str(user_input), {"__builtins__": {}}, {})
+                        new_value = round(float(result), 2)
+                        
+                        # Update the value
+                        months_data = st.session_state.data.get('months', {})
+                        current_month = st.session_state.current_month
+                        if current_month in months_data:
+                            if 'expenses' not in months_data[current_month]:
+                                months_data[current_month]['expenses'] = {}
+                            months_data[current_month]['expenses'][category] = new_value
+                            
+                            # Save immediately
+                            save_user_data(st.session_state.username, st.session_state.data)
+                            
+                            # Update the input field value in session state
+                            st.session_state[input_key] = f"{new_value:.2f}"
+                    except:
+                        pass
+            
+            # Display each category
             for i, category in enumerate(user_categories):
                 current_value = float(current_data['expenses'].get(category, 0))
-                
-                # Format value to 2 decimal places for display
                 display_value = f"{current_value:.2f}" if current_value > 0 else ""
                 
-                # Create row with text input and calculate button
-                col_input, col_calc = st.columns([5, 1])
+                input_key = f'expense_{category}_{i}'
                 
-                with col_input:
-                    # Text input that accepts math expressions
-                    user_input = st.text_input(
-                        category,
-                        value=display_value,
-                        key=f'expense_{category}_{i}',
-                        label_visibility="visible"
-                    )
+                # Text input with on_change callback
+                user_input = st.text_input(
+                    category,
+                    value=display_value,
+                    key=input_key,
+                    on_change=calculate_expense,
+                    args=(category, input_key)
+                )
                 
-                with col_calc:
-                    # Small calculate button
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("=", key=f'calc_{category}_{i}', help="Calculate", use_container_width=True):
-                        if user_input and any(op in user_input for op in ['+', '-', '*', '/']):
-                            try:
-                                # Evaluate the expression
-                                result = eval(user_input, {"__builtins__": {}}, {})
-                                new_value = round(float(result), 2)
-                                
-                                # Update and save
-                                current_data['expenses'][category] = new_value
-                                st.session_state.data['months'][st.session_state.current_month] = current_data
-                                save_user_data(st.session_state.username, st.session_state.data)
-                                
-                                st.rerun()
-                            except:
-                                pass
-                
-                # Update value if it's just a number (no operators)
+                # Update value for non-math inputs
                 if user_input and not any(op in user_input for op in ['+', '-', '*', '/']):
                     try:
                         current_data['expenses'][category] = round(float(user_input), 2)
