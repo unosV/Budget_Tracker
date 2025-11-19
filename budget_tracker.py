@@ -102,7 +102,7 @@ def logout():
         if key in st.session_state:
             del st.session_state[key]
 
-# ============= BUDGET FUNCTIONS (Same as before) =============
+# ============= BUDGET FUNCTIONS =============
 
 def get_month_key():
     """Get current month key in YYYY-MM format"""
@@ -120,25 +120,42 @@ def initialize_session_state():
             st.session_state.current_month = get_month_key()
 
 def create_pie_chart(expenses_data, title):
-    """Create expense breakdown pie chart"""
+    """Create expense breakdown pie chart - FIXED LAYOUT"""
     df = pd.DataFrame(list(expenses_data.items()), columns=['Category', 'Amount'])
     df = df[df['Amount'] > 0]
     
     colors = px.colors.qualitative.Set2
     
-    fig = px.pie(df, values='Amount', names='Category', title=title,
+    fig = px.pie(df, values='Amount', names='Category', 
                  hole=0.4, color_discrete_sequence=colors)
     fig.update_traces(
-        textposition='outside', 
-        textinfo='percent+label',
-        textfont_size=14,
-        textfont_color='black'
+        textposition='inside', 
+        textinfo='percent',
+        textfont_size=12
     )
-    fig.update_layout(height=450)
+    fig.update_layout(
+        height=500,
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor='center',
+            y=0.98,
+            font=dict(size=18)
+        ),
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05,
+            font=dict(size=11)
+        ),
+        margin=dict(l=20, r=180, t=60, b=20)
+    )
     return fig
 
 def create_bar_chart(expenses_data, income, title):
-    """Create income vs expenses bar chart"""
+    """Create income vs expenses bar chart - FIXED LAYOUT"""
     total_expenses = sum(expenses_data.values())
     savings = income - total_expenses
     
@@ -149,8 +166,7 @@ def create_bar_chart(expenses_data, income, title):
             y=[income], 
             marker_color='#2ecc71',
             text=[f'${income:,.0f}'],
-            textposition='outside',
-            textfont=dict(size=16, color='black')
+            textposition='outside'
         ),
         go.Bar(
             name='Expenses', 
@@ -158,8 +174,7 @@ def create_bar_chart(expenses_data, income, title):
             y=[total_expenses], 
             marker_color='#e74c3c',
             text=[f'${total_expenses:,.0f}'],
-            textposition='outside',
-            textfont=dict(size=16, color='black')
+            textposition='outside'
         ),
         go.Bar(
             name='Savings', 
@@ -167,18 +182,31 @@ def create_bar_chart(expenses_data, income, title):
             y=[savings], 
             marker_color='#3498db',
             text=[f'${savings:,.0f}'],
-            textposition='outside',
-            textfont=dict(size=16, color='black')
+            textposition='outside'
         )
     ])
     
     fig.update_layout(
-        title=title,
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor='center',
+            y=0.98,
+            font=dict(size=18)
+        ),
         barmode='group',
-        height=450,
+        height=500,
         yaxis_title='Amount ($)',
-        font=dict(size=14, color='black'),
-        showlegend=True
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.12,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12)
+        ),
+        margin=dict(l=60, r=60, t=70, b=80)
     )
     return fig
 
@@ -215,11 +243,17 @@ def create_trend_chart(data, metric):
     ))
     
     fig.update_layout(
-        title=f"{metric.capitalize()} Trend",
+        title=dict(
+            text=f"{metric.capitalize()} Trend",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18)
+        ),
         xaxis_title="Month",
         yaxis_title=f"Amount ($)",
-        height=400,
-        font=dict(size=14, color='black')
+        height=450,
+        font=dict(size=14),
+        margin=dict(l=60, r=60, t=70, b=60)
     )
     return fig
 
@@ -455,13 +489,13 @@ else:
             if total_expenses > 0:
                 st.plotly_chart(
                     create_pie_chart(current_data['expenses'], "Expense Breakdown"),
-                    width='stretch'
+                    use_container_width=True
                 )
         
         with col2:
             st.plotly_chart(
                 create_bar_chart(current_data['expenses'], income, "Budget Overview"),
-                width='stretch'
+                use_container_width=True
             )
         
         st.markdown("---")
@@ -472,7 +506,7 @@ else:
             columns=['Category', 'Amount', '% of Total']
         )
         expense_df = expense_df.sort_values('Amount', ascending=False)
-        st.dataframe(expense_df, width='stretch', hide_index=True)
+        st.dataframe(expense_df, use_container_width=True, hide_index=True)
     
     # TAB 3: Trends & Insights
     with tab3:
@@ -484,18 +518,18 @@ else:
             with col1:
                 st.plotly_chart(
                     create_trend_chart(st.session_state.data, 'savings'),
-                    width='stretch'
+                    use_container_width=True
                 )
             
             with col2:
                 st.plotly_chart(
                     create_trend_chart(st.session_state.data, 'expenses'),
-                    width='stretch'
+                    use_container_width=True
                 )
             
             st.plotly_chart(
                 create_trend_chart(st.session_state.data, 'debt'),
-                width='stretch'
+                use_container_width=True
             )
             
             st.markdown("---")
@@ -523,7 +557,7 @@ else:
                     'Debt': f"${month_debt:,.2f}"
                 })
             
-            st.dataframe(pd.DataFrame(comparison_data), width='stretch', hide_index=True)
+            st.dataframe(pd.DataFrame(comparison_data), use_container_width=True, hide_index=True)
             
         else:
             st.info("📝 Enter data for at least 2 months to see trends and insights!")
