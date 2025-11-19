@@ -611,46 +611,44 @@ else:
                 # Format value to 2 decimal places for display
                 display_value = f"{current_value:.2f}" if current_value > 0 else ""
                 
-                # Text input that accepts math expressions
-                user_input = st.text_input(
-                    category,
-                    value=display_value,
-                    key=f'expense_{category}_{i}'
-                )
+                # Create row with text input and calculate button
+                col_input, col_calc = st.columns([5, 1])
                 
-                # Auto-evaluate and update if it's a math expression
-                if user_input and user_input != display_value:
-                    try:
-                        # Check if it contains math operators
-                        if any(op in user_input for op in ['+', '-', '*', '/']):
-                            # Evaluate the expression safely
-                            result = eval(user_input, {"__builtins__": {}}, {})
-                            # Round to 2 decimal places
-                            new_value = round(float(result), 2)
-                            
-                            # Update the stored value
-                            current_data['expenses'][category] = new_value
-                            
-                            # Save immediately
-                            st.session_state.data['months'][st.session_state.current_month] = current_data
-                            save_user_data(st.session_state.username, st.session_state.data)
-                            
-                            # Force immediate update by rerunning
-                            st.rerun()
-                        else:
-                            # Just a number - round to 2 decimals
-                            current_data['expenses'][category] = round(float(user_input), 2)
-                    except:
-                        # Invalid expression, keep old value
-                        current_data['expenses'][category] = current_value
-                elif user_input:
-                    # Valid number input - round to 2 decimals
+                with col_input:
+                    # Text input that accepts math expressions
+                    user_input = st.text_input(
+                        category,
+                        value=display_value,
+                        key=f'expense_{category}_{i}',
+                        label_visibility="visible"
+                    )
+                
+                with col_calc:
+                    # Small calculate button
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("=", key=f'calc_{category}_{i}', help="Calculate", use_container_width=True):
+                        if user_input and any(op in user_input for op in ['+', '-', '*', '/']):
+                            try:
+                                # Evaluate the expression
+                                result = eval(user_input, {"__builtins__": {}}, {})
+                                new_value = round(float(result), 2)
+                                
+                                # Update and save
+                                current_data['expenses'][category] = new_value
+                                st.session_state.data['months'][st.session_state.current_month] = current_data
+                                save_user_data(st.session_state.username, st.session_state.data)
+                                
+                                st.rerun()
+                            except:
+                                pass
+                
+                # Update value if it's just a number (no operators)
+                if user_input and not any(op in user_input for op in ['+', '-', '*', '/']):
                     try:
                         current_data['expenses'][category] = round(float(user_input), 2)
                     except:
                         current_data['expenses'][category] = current_value
-                else:
-                    # Empty input = 0
+                elif not user_input:
                     current_data['expenses'][category] = 0
         
         # Add custom one-time expense
