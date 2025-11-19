@@ -604,54 +604,52 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            # Callback function to handle calculation
-            def calculate_expense(category, input_key):
-                user_input = st.session_state[input_key]
-                if user_input and any(op in str(user_input) for op in ['+', '-', '*', '/']):
-                    try:
-                        result = eval(str(user_input), {"__builtins__": {}}, {})
-                        new_value = round(float(result), 2)
-                        
-                        # Update the value
-                        months_data = st.session_state.data.get('months', {})
-                        current_month = st.session_state.current_month
-                        if current_month in months_data:
-                            if 'expenses' not in months_data[current_month]:
-                                months_data[current_month]['expenses'] = {}
-                            months_data[current_month]['expenses'][category] = new_value
-                            
-                            # Save immediately
-                            save_user_data(st.session_state.username, st.session_state.data)
-                            
-                            # Update the input field value in session state
-                            st.session_state[input_key] = f"{new_value:.2f}"
-                    except:
-                        pass
-            
-            # Display each category
-            for i, category in enumerate(user_categories):
-                current_value = float(current_data['expenses'].get(category, 0))
-                display_value = f"{current_value:.2f}" if current_value > 0 else ""
+            # Use form to capture Enter key
+            with st.form(key='expense_form', clear_on_submit=False):
+                # Display each category
+                expense_updates = {}
                 
-                input_key = f'expense_{category}_{i}'
+                for i, category in enumerate(user_categories):
+                    current_value = float(current_data['expenses'].get(category, 0))
+                    display_value = f"{current_value:.2f}" if current_value > 0 else ""
+                    
+                    # Text input
+                    user_input = st.text_input(
+                        category,
+                        value=display_value,
+                        key=f'expense_{category}_{i}'
+                    )
+                    
+                    # Store for processing
+                    expense_updates[category] = user_input
                 
-                # Text input with on_change callback
-                user_input = st.text_input(
-                    category,
-                    value=display_value,
-                    key=input_key,
-                    on_change=calculate_expense,
-                    args=(category, input_key)
-                )
+                # Hidden submit button (triggers on Enter)
+                submitted = st.form_submit_button("Update", type="primary")
                 
-                # Update value for non-math inputs
-                if user_input and not any(op in user_input for op in ['+', '-', '*', '/']):
-                    try:
-                        current_data['expenses'][category] = round(float(user_input), 2)
-                    except:
-                        current_data['expenses'][category] = current_value
-                elif not user_input:
-                    current_data['expenses'][category] = 0
+                if submitted:
+                    # Process all updates
+                    for category, user_input in expense_updates.items():
+                        if user_input:
+                            # Check if it's a math expression
+                            if any(op in user_input for op in ['+', '-', '*', '/']):
+                                try:
+                                    result = eval(user_input, {"__builtins__": {}}, {})
+                                    current_data['expenses'][category] = round(float(result), 2)
+                                except:
+                                    pass
+                            else:
+                                # Just a number
+                                try:
+                                    current_data['expenses'][category] = round(float(user_input), 2)
+                                except:
+                                    pass
+                        else:
+                            current_data['expenses'][category] = 0
+                    
+                    # Save and rerun
+                    st.session_state.data['months'][st.session_state.current_month] = current_data
+                    save_user_data(st.session_state.username, st.session_state.data)
+                    st.rerun()
         
         # Add custom one-time expense
         st.markdown("---")
