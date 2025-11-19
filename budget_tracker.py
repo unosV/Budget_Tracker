@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import json
-import hashlib
+import os
 from pathlib import Path
 
 # Page config
@@ -15,8 +15,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# File paths
-USERS_FILE = Path("users.json")
+# Minimal CSS - Just clean background, everything else is default
+st.markdown("""
+<style>
+    .stApp {
+        background: #f5f5f5;
+    }
+    .main .block-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Data file path
+DATA_FILE = Path("budget_data.json")
 
 # Default expense categories
 DEFAULT_CATEGORIES = [
@@ -25,84 +39,17 @@ DEFAULT_CATEGORIES = [
     "Debt Repayment", "Dining Out", "Shopping", "Other"
 ]
 
-# ============= AUTHENTICATION FUNCTIONS =============
-
-def hash_password(password):
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def load_users():
-    """Load user credentials"""
-    if USERS_FILE.exists():
-        with open(USERS_FILE, 'r') as f:
+def load_data():
+    """Load budget data from JSON file"""
+    if DATA_FILE.exists():
+        with open(DATA_FILE, 'r') as f:
             return json.load(f)
     return {}
 
-def save_users(users):
-    """Save user credentials"""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
-
-def get_user_data_file(username):
-    """Get data file path for specific user"""
-    return Path(f"budget_data_{username}.json")
-
-def load_user_data(username):
-    """Load budget data for specific user"""
-    data_file = get_user_data_file(username)
-    if data_file.exists():
-        with open(data_file, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_user_data(username, data):
-    """Save budget data for specific user"""
-    data_file = get_user_data_file(username)
-    with open(data_file, 'w') as f:
+def save_data(data):
+    """Save budget data to JSON file"""
+    with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=2)
-
-def signup(username, password, email):
-    """Create new user account"""
-    users = load_users()
-    
-    if username in users:
-        return False, "Username already exists!"
-    
-    if len(password) < 6:
-        return False, "Password must be at least 6 characters!"
-    
-    users[username] = {
-        'password': hash_password(password),
-        'email': email,
-        'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
-    save_users(users)
-    
-    # Initialize empty budget data for new user
-    save_user_data(username, {})
-    
-    return True, "Account created successfully! Please login."
-
-def login(username, password):
-    """Authenticate user"""
-    users = load_users()
-    
-    if username not in users:
-        return False, "Username not found!"
-    
-    if users[username]['password'] != hash_password(password):
-        return False, "Incorrect password!"
-    
-    return True, "Login successful!"
-
-def logout():
-    """Logout user"""
-    for key in ['logged_in', 'username', 'data', 'current_month']:
-        if key in st.session_state:
-            del st.session_state[key]
-
-# ============= BUDGET FUNCTIONS (Same as before) =============
 
 def get_month_key():
     """Get current month key in YYYY-MM format"""
@@ -110,31 +57,46 @@ def get_month_key():
 
 def initialize_session_state():
     """Initialize session state variables"""
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
-    
-    if st.session_state.logged_in:
-        if 'data' not in st.session_state:
-            st.session_state.data = load_user_data(st.session_state.username)
-        if 'current_month' not in st.session_state:
-            st.session_state.current_month = get_month_key()
+    if 'data' not in st.session_state:
+        st.session_state.data = load_data()
+    if 'current_month' not in st.session_state:
+        st.session_state.current_month = get_month_key()
 
 def create_pie_chart(expenses_data, title):
     """Create expense breakdown pie chart"""
     df = pd.DataFrame(list(expenses_data.items()), columns=['Category', 'Amount'])
-    df = df[df['Amount'] > 0]
+    df = df[df['Amount'] > 0]  # Filter out zero values
     
-    colors = px.colors.qualitative.Set2
+    # Professional color palette - muted and clean
+    colors = ['#3182ce', '#38a169', '#e53e3e', '#d69e2e', '#805ad5', 
+              '#dd6b20', '#319795', '#e53e8e', '#2c7a7b', '#c53030',
+              '#5a67d8', '#2d3748']
     
     fig = px.pie(df, values='Amount', names='Category', title=title,
-                 hole=0.4, color_discrete_sequence=colors)
+                 hole=0.35, color_discrete_sequence=colors)
     fig.update_traces(
-        textposition='outside', 
+        textposition='inside', 
         textinfo='percent+label',
-        textfont_size=14,
-        textfont_color='white'
+        textfont_size=11,
+        marker=dict(line=dict(color='white', width=2))
     )
-    fig.update_layout(height=450)
+    fig.update_layout(
+        height=400,
+        title_font_size=18,
+        title_font_color='#2d3748',
+        font=dict(size=12, color='#2d3748'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05
+        ),
+        margin=dict(l=20, r=180, t=60, b=20)
+    )
     return fig
 
 def create_bar_chart(expenses_data, income, title):
@@ -147,38 +109,52 @@ def create_bar_chart(expenses_data, income, title):
             name='Income', 
             x=['Budget'], 
             y=[income], 
-            marker_color='#2ecc71',
+            marker_color='#38a169',
             text=[f'${income:,.0f}'],
             textposition='outside',
-            textfont=dict(size=16, color='white')
+            textfont=dict(size=13, color='#2d3748', weight='bold')
         ),
         go.Bar(
             name='Expenses', 
             x=['Budget'], 
             y=[total_expenses], 
-            marker_color='#e74c3c',
+            marker_color='#e53e3e',
             text=[f'${total_expenses:,.0f}'],
             textposition='outside',
-            textfont=dict(size=16, color='black')
+            textfont=dict(size=13, color='#2d3748', weight='bold')
         ),
         go.Bar(
             name='Savings', 
             x=['Budget'], 
             y=[savings], 
-            marker_color='#3498db',
+            marker_color='#3182ce',
             text=[f'${savings:,.0f}'],
             textposition='outside',
-            textfont=dict(size=16, color='white')
+            textfont=dict(size=13, color='#2d3748', weight='bold')
         )
     ])
     
     fig.update_layout(
         title=title,
+        title_font_size=18,
+        title_font_color='#2d3748',
         barmode='group',
-        height=450,
+        height=400,
         yaxis_title='Amount ($)',
-        font=dict(size=14, color='white'),
-        showlegend=True
+        font=dict(size=12, color='#2d3748'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        yaxis=dict(gridcolor='#e2e8f0', showgrid=True),
+        xaxis=dict(showgrid=False),
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=60, t=80, b=80)
     )
     return fig
 
@@ -198,10 +174,17 @@ def create_trend_chart(data, metric):
         elif metric == 'debt':
             values.append(month_data.get('debt', 0))
     
+    # Professional color scheme based on metric
     colors = {
-        'savings': '#2ecc71',
-        'expenses': '#e74c3c',
-        'debt': '#f39c12'
+        'savings': '#38a169',
+        'expenses': '#e53e3e',
+        'debt': '#d69e2e'
+    }
+    
+    fill_colors = {
+        'savings': 'rgba(56, 161, 105, 0.08)',
+        'expenses': 'rgba(229, 62, 62, 0.08)',
+        'debt': 'rgba(214, 158, 46, 0.08)'
     }
     
     fig = go.Figure()
@@ -210,21 +193,32 @@ def create_trend_chart(data, metric):
         y=values, 
         mode='lines+markers',
         name=metric.capitalize(),
-        line=dict(width=4, color=colors.get(metric, '#3498db')),
-        marker=dict(size=12, color=colors.get(metric, '#3498db'))
+        line=dict(width=3, color=colors.get(metric, '#3182ce')),
+        marker=dict(size=8, color=colors.get(metric, '#3182ce'), 
+                   line=dict(width=2, color='white')),
+        fill='tozeroy',
+        fillcolor=fill_colors.get(metric, 'rgba(49, 130, 206, 0.08)')
     ))
     
     fig.update_layout(
-        title=f"{metric.capitalize()} Trend",
+        title=f"Month-over-Month {metric.capitalize()} Trend",
+        title_font_size=18,
+        title_font_color='#2d3748',
         xaxis_title="Month",
         yaxis_title=f"Amount ($)",
         height=400,
-        font=dict(size=14, color='black')
+        hovermode='x unified',
+        font=dict(size=12, color='#2d3748'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(gridcolor='#e2e8f0', showgrid=True),
+        yaxis=dict(gridcolor='#e2e8f0', showgrid=True),
+        margin=dict(l=60, r=60, t=70, b=60)
     )
     return fig
 
 def calculate_insights(current_data, historical_data):
-    """Generate smart insights"""
+    """Generate smart insights based on spending patterns"""
     insights = []
     
     current_income = current_data.get('income', 0)
@@ -232,6 +226,7 @@ def calculate_insights(current_data, historical_data):
     current_savings = current_income - current_expenses
     current_debt = current_data.get('debt', 0)
     
+    # Savings rate
     if current_income > 0:
         savings_rate = (current_savings / current_income) * 100
         if savings_rate > 20:
@@ -241,11 +236,13 @@ def calculate_insights(current_data, historical_data):
         else:
             insights.append(f"⚠️ You're only saving {savings_rate:.1f}%. Aim for at least 10-20%.")
     
+    # Expense analysis
     if current_expenses > 0:
         expenses_dict = current_data.get('expenses', {})
         top_expense = max(expenses_dict.items(), key=lambda x: x[1])
         insights.append(f"📊 Your highest expense is {top_expense[0]} at ${top_expense[1]:,.2f}")
     
+    # Historical comparison
     if len(historical_data) > 1:
         sorted_months = sorted(historical_data.keys())
         if len(sorted_months) >= 2:
@@ -259,292 +256,252 @@ def calculate_insights(current_data, historical_data):
                 change = ((prev_expenses - current_expenses) / prev_expenses) * 100
                 insights.append(f"📉 Great! Expenses decreased by {change:.1f}% from last month")
     
-    if current_debt > 0 and current_savings > 0:
-        months_to_clear = current_debt / current_savings
-        insights.append(f"💡 At your current savings rate, you can clear your debt in {months_to_clear:.1f} months")
+    # Debt warning
+    if current_debt > 0:
+        if current_debt > current_income:
+            insights.append(f"🚨 Your debt (${current_debt:,.2f}) exceeds your monthly income. Consider debt consolidation.")
+        elif current_savings > 0:
+            months_to_clear = current_debt / current_savings
+            insights.append(f"💡 At your current savings rate, you can clear your debt in {months_to_clear:.1f} months")
     
+    # Budget recommendations
     if current_income > 0:
+        recommended_savings = current_income * 0.2
         recommended_expenses = current_income * 0.8
+        
         if current_expenses > recommended_expenses:
             insights.append(f"💰 Try to reduce expenses to ${recommended_expenses:,.2f} (80% of income)")
     
     return insights
 
-# ============= MAIN APP =============
-
+# Initialize
 initialize_session_state()
 
-# LOGIN/SIGNUP PAGE
-if not st.session_state.logged_in:
-    st.title("💰 Smart Budget Tracker")
-    st.markdown("### Personal Finance Management with Multi-User Support")
-    st.markdown("---")
-    
-    tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
-    
-    with tab1:
-        st.subheader("Login to Your Account")
-        
-        login_username = st.text_input("Username", key="login_username")
-        login_password = st.text_input("Password", type="password", key="login_password")
-        
-        if st.button("Login", type="primary"):
-            if login_username and login_password:
-                success, message = login(login_username, login_password)
-                if success:
-                    st.session_state.logged_in = True
-                    st.session_state.username = login_username
-                    st.session_state.data = load_user_data(login_username)
-                    st.success(message)
-                    st.rerun()
-                else:
-                    st.error(message)
-            else:
-                st.warning("Please enter both username and password")
-    
-    with tab2:
-        st.subheader("Create New Account")
-        
-        signup_username = st.text_input("Choose Username", key="signup_username")
-        signup_email = st.text_input("Email (optional)", key="signup_email")
-        signup_password = st.text_input("Choose Password (min 6 characters)", type="password", key="signup_password")
-        signup_password_confirm = st.text_input("Confirm Password", type="password", key="signup_password_confirm")
-        
-        if st.button("Create Account", type="primary"):
-            if signup_username and signup_password and signup_password_confirm:
-                if signup_password != signup_password_confirm:
-                    st.error("Passwords don't match!")
-                else:
-                    success, message = signup(signup_username, signup_password, signup_email)
-                    if success:
-                        st.success(message)
-                    else:
-                        st.error(message)
-            else:
-                st.warning("Please fill in all required fields")
-    
-    st.markdown("---")
-    st.info("👥 Each user has their own private budget data. Your information is stored securely.")
+# Header
+st.title("💰 Smart Budget Tracker")
+st.markdown("""
+<div style='text-align: center; color: #718096; font-size: 1.1rem; margin-bottom: 2rem; font-weight: 500;'>
+    Track your finances with beautiful insights and smart analytics
+</div>
+""", unsafe_allow_html=True)
 
-# MAIN BUDGET TRACKER (Only shown when logged in)
-else:
-    # Header with logout
-    col1, col2 = st.columns([6, 1])
+# Sidebar for month selection
+st.sidebar.header("Month Selection")
+all_months = sorted(list(st.session_state.data.keys()) + [get_month_key()])
+all_months = sorted(list(set(all_months)), reverse=True)
+
+selected_month = st.sidebar.selectbox(
+    "Select Month",
+    all_months,
+    index=0 if get_month_key() in all_months else len(all_months)-1
+)
+
+st.session_state.current_month = selected_month
+
+# Check if this is a new month
+if selected_month not in st.session_state.data:
+    st.session_state.data[selected_month] = {
+        'income': 0,
+        'expenses': {cat: 0 for cat in DEFAULT_CATEGORIES},
+        'debt': 0
+    }
+
+current_data = st.session_state.data[selected_month]
+
+# Main content
+tab1, tab2, tab3 = st.tabs(["📝 Budget Input", "📊 Current Month", "📈 Trends & Insights"])
+
+# TAB 1: Input
+with tab1:
+    st.header(f"Budget for {selected_month}")
+    
+    col1, col2 = st.columns(2)
+    
     with col1:
-        st.title(f"💰 Smart Budget Tracker")
-        st.markdown(f"### Welcome back, **{st.session_state.username}**!")
+        st.subheader("💵 Income")
+        income = st.number_input(
+            "Monthly Income (after tax)",
+            min_value=0.0,
+            value=float(current_data.get('income', 0)),
+            step=100.0,
+            key='income_input'
+        )
+        current_data['income'] = income
+        
+        st.subheader("💳 Debt")
+        debt = st.number_input(
+            "Total Outstanding Debt",
+            min_value=0.0,
+            value=float(current_data.get('debt', 0)),
+            step=100.0,
+            key='debt_input'
+        )
+        current_data['debt'] = debt
+    
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚪 Logout"):
-            logout()
-            st.rerun()
+        st.subheader("💸 Expenses")
+        
+        if 'expenses' not in current_data:
+            current_data['expenses'] = {cat: 0 for cat in DEFAULT_CATEGORIES}
+        
+        for category in DEFAULT_CATEGORIES:
+            current_data['expenses'][category] = st.number_input(
+                category,
+                min_value=0.0,
+                value=float(current_data['expenses'].get(category, 0)),
+                step=10.0,
+                key=f'expense_{category}'
+            )
+    
+    # Add custom category
+    st.subheader("➕ Add Custom Category")
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        custom_category = st.text_input("Category Name", key='custom_cat_name')
+    with col_b:
+        custom_amount = st.number_input("Amount", min_value=0.0, step=10.0, key='custom_cat_amount')
+    
+    if st.button("Add Category") and custom_category:
+        current_data['expenses'][custom_category] = custom_amount
+        st.success(f"Added {custom_category}!")
+        st.rerun()
+    
+    # Save button
+    if st.button("💾 Save Month Data", type="primary"):
+        save_data(st.session_state.data)
+        st.success(f"✅ Data saved for {selected_month}!")
+
+# TAB 2: Current Month Analysis
+with tab2:
+    st.header(f"Analysis for {selected_month}")
+    
+    total_expenses = sum(current_data.get('expenses', {}).values())
+    total_savings = income - total_expenses
+    
+    # Key metrics with clean cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("💵 Income", f"${income:,.2f}")
+    with col2:
+        st.metric("💸 Expenses", f"${total_expenses:,.2f}")
+    with col3:
+        savings_emoji = "🎉" if total_savings > 0 else "⚠️"
+        st.metric(f"{savings_emoji} Savings", f"${total_savings:,.2f}", 
+                 delta=f"{(total_savings/income*100):.1f}%" if income > 0 else "0%")
+    with col4:
+        debt_emoji = "💳" if debt > 0 else "✅"
+        st.metric(f"{debt_emoji} Debt", f"${debt:,.2f}")
     
     st.markdown("---")
     
-    # Sidebar
-    st.sidebar.title("Month Selection")
-    all_months = sorted(list(st.session_state.data.keys()) + [get_month_key()])
-    all_months = sorted(list(set(all_months)), reverse=True)
+    # Charts
+    st.subheader("📊 Visual Analysis")
+    col1, col2 = st.columns(2)
     
-    selected_month = st.sidebar.selectbox(
-        "Select Month",
-        all_months,
-        index=0 if get_month_key() in all_months else len(all_months)-1
+    with col1:
+        if total_expenses > 0:
+            st.plotly_chart(
+                create_pie_chart(current_data['expenses'], "Expense Breakdown"),
+                width='stretch'
+            )
+    
+    with col2:
+        st.plotly_chart(
+            create_bar_chart(current_data['expenses'], income, "Budget Overview"),
+            width='stretch'
+        )
+    
+    # Detailed breakdown
+    st.subheader("📋 Detailed Breakdown")
+    expense_df = pd.DataFrame(
+        [(cat, amt, f"{(amt/total_expenses*100):.1f}%" if total_expenses > 0 else "0%") 
+         for cat, amt in current_data['expenses'].items() if amt > 0],
+        columns=['Category', 'Amount', '% of Total']
     )
+    expense_df = expense_df.sort_values('Amount', ascending=False)
+    st.dataframe(expense_df, width='stretch', hide_index=True)
+
+# TAB 3: Trends & Insights
+with tab3:
+    st.header("📈 Historical Trends & Insights")
     
-    st.session_state.current_month = selected_month
-    
-    if selected_month not in st.session_state.data:
-        st.session_state.data[selected_month] = {
-            'income': 0,
-            'expenses': {cat: 0 for cat in DEFAULT_CATEGORIES},
-            'debt': 0
-        }
-    
-    current_data = st.session_state.data[selected_month]
-    
-    # Main content
-    tab1, tab2, tab3 = st.tabs(["📝 Budget Input", "📊 Current Month", "📈 Trends & Insights"])
-    
-    # TAB 1: Input
-    with tab1:
-        st.header(f"Budget for {selected_month}")
-        
+    if len(st.session_state.data) > 1:
+        # Trend charts
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("💵 Income")
-            income = st.number_input(
-                "Monthly Income (after tax)",
-                min_value=0.0,
-                value=float(current_data.get('income', 0)),
-                step=100.0,
-                key='income_input'
-            )
-            current_data['income'] = income
-            
-            st.subheader("💳 Debt")
-            debt = st.number_input(
-                "Total Outstanding Debt",
-                min_value=0.0,
-                value=float(current_data.get('debt', 0)),
-                step=100.0,
-                key='debt_input'
-            )
-            current_data['debt'] = debt
-        
-        with col2:
-            st.subheader("💸 Expenses")
-            
-            if 'expenses' not in current_data:
-                current_data['expenses'] = {cat: 0 for cat in DEFAULT_CATEGORIES}
-            
-            for category in DEFAULT_CATEGORIES:
-                current_data['expenses'][category] = st.number_input(
-                    category,
-                    min_value=0.0,
-                    value=float(current_data['expenses'].get(category, 0)),
-                    step=10.0,
-                    key=f'expense_{category}'
-                )
-        
-        # Add custom category
-        st.markdown("---")
-        st.subheader("➕ Add Custom Category")
-        col_a, col_b = st.columns([3, 1])
-        with col_a:
-            custom_category = st.text_input("Category Name", key='custom_cat_name')
-        with col_b:
-            custom_amount = st.number_input("Amount", min_value=0.0, step=10.0, key='custom_cat_amount')
-        
-        if st.button("Add Category") and custom_category:
-            current_data['expenses'][custom_category] = custom_amount
-            st.success(f"Added {custom_category}!")
-            st.rerun()
-        
-        # Save button
-        st.markdown("---")
-        if st.button("💾 Save Month Data", type="primary"):
-            save_user_data(st.session_state.username, st.session_state.data)
-            st.success(f"✅ Data saved for {selected_month}!")
-    
-    # TAB 2: Current Month Analysis
-    with tab2:
-        st.header(f"Analysis for {selected_month}")
-        
-        total_expenses = sum(current_data.get('expenses', {}).values())
-        total_savings = income - total_expenses
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("💵 Income", f"${income:,.2f}")
-        with col2:
-            st.metric("💸 Expenses", f"${total_expenses:,.2f}")
-        with col3:
-            st.metric("🎉 Savings", f"${total_savings:,.2f}", 
-                     delta=f"{(total_savings/income*100):.1f}%" if income > 0 else "0%")
-        with col4:
-            st.metric("💳 Debt", f"${debt:,.2f}")
-        
-        st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if total_expenses > 0:
-                st.plotly_chart(
-                    create_pie_chart(current_data['expenses'], "Expense Breakdown"),
-                    width='stretch'
-                )
-        
-        with col2:
             st.plotly_chart(
-                create_bar_chart(current_data['expenses'], income, "Budget Overview"),
+                create_trend_chart(st.session_state.data, 'savings'),
                 width='stretch'
             )
         
-        st.markdown("---")
-        st.subheader("📋 Detailed Breakdown")
-        expense_df = pd.DataFrame(
-            [(cat, f"${amt:,.2f}", f"{(amt/total_expenses*100):.1f}%" if total_expenses > 0 else "0%") 
-             for cat, amt in current_data['expenses'].items() if amt > 0],
-            columns=['Category', 'Amount', '% of Total']
+        with col2:
+            st.plotly_chart(
+                create_trend_chart(st.session_state.data, 'expenses'),
+                width='stretch'
+            )
+        
+        st.plotly_chart(
+            create_trend_chart(st.session_state.data, 'debt'),
+            width='stretch'
         )
-        expense_df = expense_df.sort_values('Amount', ascending=False)
-        st.dataframe(expense_df, width='stretch', hide_index=True)
-    
-    # TAB 3: Trends & Insights
-    with tab3:
-        st.header("📈 Historical Trends & Insights")
         
-        if len(st.session_state.data) > 1:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.plotly_chart(
-                    create_trend_chart(st.session_state.data, 'savings'),
-                    width='stretch'
-                )
-            
-            with col2:
-                st.plotly_chart(
-                    create_trend_chart(st.session_state.data, 'expenses'),
-                    width='stretch'
-                )
-            
-            st.plotly_chart(
-                create_trend_chart(st.session_state.data, 'debt'),
-                width='stretch'
-            )
-            
-            st.markdown("---")
-            st.subheader("🧠 Smart Insights")
-            insights = calculate_insights(current_data, st.session_state.data)
-            
-            for insight in insights:
+        # Insights with beautiful cards
+        st.subheader("🧠 Smart Insights")
+        insights = calculate_insights(current_data, st.session_state.data)
+        st.markdown("---")
+        
+        for i, insight in enumerate(insights):
+            # Color code insights
+            if "🎉" in insight or "📉" in insight or "Great" in insight:
+                st.success(insight)
+            elif "⚠️" in insight or "🚨" in insight:
+                st.warning(insight)
+            else:
                 st.info(insight)
+        
+        # Historical comparison table
+        st.subheader("📊 Month-by-Month Comparison")
+        comparison_data = []
+        for month, data in sorted(st.session_state.data.items(), reverse=True):
+            month_income = data.get('income', 0)
+            month_expenses = sum(data.get('expenses', {}).values())
+            month_savings = month_income - month_expenses
+            month_debt = data.get('debt', 0)
             
-            st.markdown("---")
-            st.subheader("📊 Month-by-Month Comparison")
-            comparison_data = []
-            for month, data in sorted(st.session_state.data.items(), reverse=True):
-                month_income = data.get('income', 0)
-                month_expenses = sum(data.get('expenses', {}).values())
-                month_savings = month_income - month_expenses
-                month_debt = data.get('debt', 0)
-                
-                comparison_data.append({
-                    'Month': month,
-                    'Income': f"${month_income:,.2f}",
-                    'Expenses': f"${month_expenses:,.2f}",
-                    'Savings': f"${month_savings:,.2f}",
-                    'Savings %': f"{(month_savings/month_income*100):.1f}%" if month_income > 0 else "0%",
-                    'Debt': f"${month_debt:,.2f}"
-                })
-            
-            st.dataframe(pd.DataFrame(comparison_data), width='stretch', hide_index=True)
-            
-        else:
-            st.info("📝 Enter data for at least 2 months to see trends and insights!")
-    
-    # Sidebar info
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 💡 Tips")
-    st.sidebar.markdown("""
-    - Save your data regularly
-    - Aim for 20% savings rate
-    - Track expenses daily
-    - Review trends monthly
-    """)
-    
-    # Export functionality
-    st.sidebar.markdown("---")
-    if st.sidebar.button("📥 Export My Data"):
-        export_data = json.dumps(st.session_state.data, indent=2)
-        st.sidebar.download_button(
-            label="Download JSON",
-            data=export_data,
-            file_name=f"budget_data_{st.session_state.username}_{datetime.now().strftime('%Y%m%d')}.json",
-            mime="application/json"
-        )
+            comparison_data.append({
+                'Month': month,
+                'Income': f"${month_income:,.2f}",
+                'Expenses': f"${month_expenses:,.2f}",
+                'Savings': f"${month_savings:,.2f}",
+                'Savings %': f"{(month_savings/month_income*100):.1f}%" if month_income > 0 else "0%",
+                'Debt': f"${month_debt:,.2f}"
+            })
+        
+        st.dataframe(pd.DataFrame(comparison_data), width='stretch', hide_index=True)
+        
+    else:
+        st.info("📝 Enter data for at least 2 months to see trends and insights!")
+
+# Footer
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 💡 Tips")
+st.sidebar.markdown("""
+- Save your data regularly
+- Aim for 20% savings rate
+- Track expenses daily for accuracy
+- Review trends monthly
+- Prioritize debt repayment
+""")
+
+# Export functionality
+st.sidebar.markdown("---")
+if st.sidebar.button("📥 Export All Data"):
+    export_data = json.dumps(st.session_state.data, indent=2)
+    st.sidebar.download_button(
+        label="Download JSON",
+        data=export_data,
+        file_name=f"budget_data_{datetime.now().strftime('%Y%m%d')}.json",
+        mime="application/json"
+    )
