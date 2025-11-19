@@ -631,6 +631,10 @@ else:
                             # Update the stored value
                             current_data['expenses'][category] = new_value
                             
+                            # Save immediately
+                            st.session_state.data['months'][st.session_state.current_month] = current_data
+                            save_user_data(st.session_state.username, st.session_state.data)
+                            
                             # Force immediate update by rerunning
                             st.rerun()
                         else:
