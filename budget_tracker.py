@@ -604,41 +604,40 @@ else:
         with col2:
             st.subheader("💸 Expenses")
             
-            # Display each category with quick add feature
+            # Display each category with clean quick add below
             for i, category in enumerate(user_categories):
-                st.markdown(f"**{category}**")
+                current_value = float(current_data['expenses'].get(category, 0))
                 
-                col_main, col_add, col_btn = st.columns([3, 2, 1])
+                # Main amount field
+                new_value = st.number_input(
+                    category,
+                    min_value=0.0,
+                    value=current_value,
+                    step=10.0,
+                    key=f'expense_{category}_{i}'
+                )
+                current_data['expenses'][category] = new_value
                 
-                with col_main:
-                    current_value = float(current_data['expenses'].get(category, 0))
-                    new_value = st.number_input(
-                        f"Total",
-                        min_value=0.0,
-                        value=current_value,
-                        step=10.0,
-                        key=f'expense_{category}_{i}',
-                        label_visibility="collapsed"
-                    )
-                    current_data['expenses'][category] = new_value
-                
+                # Quick add below (inline)
+                col_add, col_btn = st.columns([4, 1])
                 with col_add:
                     add_amount = st.number_input(
-                        f"Quick Add",
+                        f"+ Add to {category}",
                         min_value=0.0,
                         value=0.0,
                         step=1.0,
                         key=f'add_{category}_{i}',
                         label_visibility="collapsed",
-                        placeholder="Quick add"
+                        placeholder=f"+ Add to {category}"
                     )
-                
                 with col_btn:
-                    if st.button("➕", key=f'btn_{category}_{i}', help=f"Add ${add_amount:.2f} to {category}"):
+                    if st.button("➕", key=f'btn_{category}_{i}', help=f"Add to {category}", use_container_width=True):
                         if add_amount > 0:
                             current_data['expenses'][category] = current_value + add_amount
-                            st.success(f"Added ${add_amount:.2f}!")
+                            st.success(f"Added ${add_amount:.2f} to {category}!")
                             st.rerun()
+                
+                st.markdown("---")
         
         # Add custom one-time expense
         st.markdown("---")
