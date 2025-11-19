@@ -129,8 +129,8 @@ def create_pie_chart(expenses_data, title):
     fig = px.pie(df, values='Amount', names='Category', 
                  hole=0.4, color_discrete_sequence=colors)
     fig.update_traces(
-        textposition='inside', 
-        textinfo='percent',
+        textposition='outside', 
+        textinfo='percent+label',
         textfont_size=12
     )
     fig.update_layout(
